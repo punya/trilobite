@@ -1,0 +1,68 @@
+buildscript {
+  repositories {
+    maven {
+      url "https://plugins.gradle.org/m2/"
+    }
+  }
+  dependencies {
+    classpath "gradle.plugin.com.palantir.gradle.javadist:gradle-java-distribution:0.3.4"
+    classpath "gradle.plugin.gradle-plugins:jartest:1.0"
+  }
+}
+
+apply plugin: "eclipse"
+apply plugin: "java"
+apply plugin: "com.github.hauner.jarTest"
+
+repositories {
+  jcenter()
+}
+
+dependencies {
+  compile "io.dropwizard:dropwizard-core:$dropwizardVersion"
+  compile("org.apache.spark:spark-sql_2.10:$defaultSparkVersion") {
+    exclude module: "slf4j-log4j12"
+  }
+
+  testCompile "junit:junit:$junitVersion"
+  testCompile "io.dropwizard:dropwizard-testing:$dropwizardVersion"
+}
+
+test.enabled = false
+
+sparkVersions.split(/,/).each { version ->
+  project("trilobite-spark${version}") {
+    apply plugin: "com.palantir.java-distribution"
+    apply plugin: "java"
+    distribution {
+      serviceName "trilobite-spark${version}"
+      mainClass "trilobite.TrilobiteApplication"
+      args "server", "var/conf/trilobite.yml"
+    }
+    repositories {
+      jcenter()
+    }
+    dependencies {
+      compile("org.apache.spark:spark-sql_2.10:${version}") {
+        exclude module: "slf4j-log4j12"
+      }
+      compile(rootProject) {
+        exclude group: "org.apache.spark"
+      }
+      testCompile(project(path: ":", configuration: "testArchives")) {
+        exclude group: "org.apache.spark"
+      }
+    }
+    task syncService(type: Sync) {
+      from rootProject.file("service")
+      into "service"
+    }
+    task syncVar(type: Sync) {
+      from rootProject.file("var")
+      into "var"
+    }
+    distTar.dependsOn syncService, syncVar
+    test.testClassesDir rootProject.sourceSets.test.output.classesDir
+  }
+}
+

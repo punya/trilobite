@@ -1,0 +1,4 @@
+sparkVersions.split(/,/).each { version ->
+  include "trilobite-spark${version}"
+}
+include "trilobite-tests"
